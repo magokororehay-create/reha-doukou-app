@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>リハ利用者動向</title>
+<style>
+  :root{--bg:#f5f5f7;--card:#fff;--ink:#1d1d1f;--mute:#8a8a8e;--line:#eee;--pri:#0f7c80;--pri-weak:#e3f3f3;--warn:#fff3cd;--err:#ffe8e8;--red:#c0392b;--amber:#b05a00;}
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;margin:0;background:var(--bg);color:var(--ink);}
+  .wrap{max-width:560px;margin:0 auto;padding:12px 16px 40px;}
+  h1{font-size:19px;margin:8px 0 12px;}
+  .card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  input,select,textarea{width:100%;padding:12px;font-size:17px;border:1px solid #ccc;border-radius:8px;font-family:inherit;background:#fff;color:var(--ink);}
+  textarea{min-height:72px;resize:vertical;}
+  label.lb{display:block;font-size:13px;color:var(--mute);font-weight:700;margin:14px 0 6px;}
+  button{font-size:16px;border:none;border-radius:10px;padding:12px;background:var(--pri);color:#fff;cursor:pointer;font-family:inherit;}
+  button.sub{background:#eef0f3;color:var(--ink);}
+  button.del{background:#eef0f3;color:#b00;}
+  button:disabled{opacity:.5;cursor:default;}
+  button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .07s ease,filter .07s ease;}
+  button:active:not(:disabled){transform:scale(.96);filter:brightness(.88);}
+  .full{width:100%;margin-top:16px;}
+  .who{font-size:12px;color:var(--mute);display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+  .who a{color:var(--pri);}
+  .tabs{display:flex;gap:6px;margin:10px 0;}
+  .tabs button{flex:1;background:#e6e8eb;color:var(--ink);white-space:nowrap;padding:12px 4px;font-size:15px;}
+  .tabs button.on{background:var(--pri);color:#fff;}
+  .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .kpi div{background:var(--card);border-radius:12px;padding:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums;}
+  .kpi small{color:var(--mute);font-size:12px;}
+  .kpi .neg{color:var(--red);} .kpi .warn{color:var(--amber);}
+  .sec{font-size:15px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .sec small{font-weight:400;color:var(--mute);font-size:13px;}
+  .item{padding:12px 0;border-bottom:1px solid var(--line);}
+  .item:last-child{border-bottom:none;}
+  .item .top{display:flex;gap:8px;align-items:baseline;}
+  .item .top b{font-size:16px;}
+  .item .top .dt{color:var(--mute);font-size:13px;}
+  .item .top .rt{margin-left:auto;text-align:right;white-space:nowrap;font-size:13px;color:var(--mute);}
+  .item .sub{font-size:13px;color:#555;margin-top:3px;overflow-wrap:anywhere;}
+  .item.tap{cursor:pointer;}
+  .days{font-size:16px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .days.long{color:var(--red);}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .chips button{background:#eef0f3;color:var(--ink);border-radius:18px;padding:8px 12px;font-size:14px;}
+  .chips button.sug{background:var(--pri-weak);color:var(--pri);box-shadow:inset 0 0 0 1.5px var(--pri);}
+  .chips button.on{background:var(--pri);color:#fff;}
+  .acts{display:flex;gap:8px;margin-top:8px;}
+  .acts button{padding:8px 14px;font-size:14px;}
+  .tag{font-size:12px;border-radius:10px;padding:2px 8px;background:#eef0f3;color:#555;white-space:nowrap;}
+  .tag.warn{background:#fff0d6;color:#8a5a00;}
+  .t-start{background:var(--pri-weak);color:var(--pri);}
+  .t-end{background:#fde8ec;color:#b0203f;}
+  .t-admit{background:#fff0d6;color:#8a5a00;}
+  .t-discharge{background:#e6f2e4;color:#3f7d3a;}
+  .t-kuhen{background:#eee9fa;color:#5b3fa3;}
+  .t-change{background:#e5eef9;color:#2f5f9e;}
+  .empty{color:var(--mute);font-size:14px;padding:6px 0;}
+  .monthbar{display:flex;align-items:center;gap:8px;}
+  .monthbar b{flex:1;text-align:center;font-size:17px;}
+  .monthbar button{padding:8px 14px;}
+  .stats{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .stats span{background:#f7f8fa;border-radius:10px;padding:4px 10px;font-size:13px;}
+  .stats b{font-variant-numeric:tabular-nums;}
+  .day h3{font-size:14px;color:var(--mute);margin:16px 0 0;padding-bottom:4px;border-bottom:2px solid var(--pri-weak);}
+  details summary{cursor:pointer;font-weight:700;font-size:15px;}
+  .muted{color:var(--mute);font-size:13px;}
+  .hint{font-size:12px;color:var(--mute);margin-top:4px;}
+  .hidden{display:none !important;}
+  #msg{position:fixed;top:8px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:528px;z-index:20;}
+  .msg{padding:12px;border-radius:10px;font-size:15px;white-space:pre-line;box-shadow:0 2px 8px rgba(0,0,0,.15);}
+  .msg.err{background:var(--err);color:#b00;}
+  .msg.ok{background:var(--pri-weak);color:var(--pri);}
+  .msg.wait{background:#1d1d1f;color:#fff;}
+  .ovl{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;z-index:10;}
+  .sheet{background:var(--card);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:16px 16px 28px;}
+  .sheet h2{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .check{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:15px;}
+  .check input{width:22px;height:22px;flex:none;}
+  #askOvl{z-index:25;align-items:center;padding:16px;}
+  #askOvl .sheet{border-radius:16px;}
+  #askText{font-size:16px;line-height:1.7;white-space:pre-line;}
+  .askBtns{display:flex;gap:10px;margin-top:18px;}
+  .askBtns button{flex:1;padding:14px 8px;}
+  @media (max-width:420px){.kpi{grid-template-columns:repeat(2,1fr);}}
+</style>
+<script>if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') document.write('<script src="mock.js"><\/script>');</script>
+</head>
+<body>
+<div class="wrap">
+  <h1>リハ利用者動向</h1>
+  <div id="msg"></div>
+
+  <div id="vLogin" class="card hidden">
+    <div class="muted">PINを入れてください（この端末では30日間入れ直さなくて済みます）</div>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" style="margin-top:8px;">
+    <button id="btnPin" class="full">入る</button>
+  </div>
+
+  <div id="vMain" class="hidden">
+    <div class="who"><span id="readAt"></span><span><a href="#" id="refresh">最新にする</a>　<a href="#" id="logout">ログアウト</a></span></div>
+    <div class="tabs">
+      <button id="tabNow" class="on">いま</button>
+      <button id="tabLog">記録</button>
+    </div>
+
+    <div id="pNow">
+      <div id="kpi" class="kpi"></div>
+      <button id="addNow" class="full sub" style="margin:12px 0">＋ 出来事を記録する</button>
+      <div class="card"><div class="sec">確認待ち <small id="inboxCount"></small></div><div id="bulkBox"></div><div id="inbox"></div></div>
+      <div class="card"><div class="sec">入院中 <small id="admCount"></small></div><div id="adm"></div></div>
+      <div class="card"><div class="sec">区変申請中 <small id="kuhenCount"></small></div><div id="kuhen"></div></div>
+      <div id="issuesCard" class="card hidden"><details><summary id="issuesHead"></summary><div id="issues"></div></details></div>
+      <div id="roster" class="muted"></div>
+    </div>
+
+    <div id="pLog" class="hidden">
+      <div class="card">
+        <div class="monthbar"><button id="mPrev" class="sub">◀</button><b id="mLabel"></b><button id="mNext" class="sub">▶</button></div>
+        <div id="mStats" class="stats"></div>
+        <button id="addLog" class="full sub">＋ 出来事を記録する</button>
+      </div>
+      <div class="card"><div id="mList"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="ovl" class="ovl hidden"><div class="sheet" id="sheet"></div></div>
+<!-- 確認（はい／やめる）。ブラウザ標準の confirm はアプリ内ブラウザ等で出ないことがあるので使わない -->
+<div id="askOvl" class="ovl hidden"><div class="sheet">
+  <div id="askText"></div>
+  <div class="askBtns"><button id="askNo" class="sub"></button><button id="askOk"></button></div>
+</div></div>
+
+<script>
+(function () {
+  'use strict';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbwlREj_b43DgZnH4dtzZUKU0vzbtPOl46kiNO_bbLiWoV8jGroMKsVpeRR5roOl3RSA/exec';
+  var TOKEN_KEY = 'rehadoukou_token', DEVICE_KEY = 'rehadoukou_device';
+  var WD = ['日', '月', '火', '水', '木', '金', '土'];
+  // hidden：押した瞬間に画面から消した確認待ちのキー。保存の返事が前後して届いても出し直さない（失敗したら外して戻す）。
+  // seq：月の切り替えを素早くしたとき、遅れて届いた古い返事で上書きしないため。
+  var S = { now: null, month: null, ym: '', readAt: '', tab: 'now', hidden: {}, seq: 0, pending: 0 };
+
+  function $(id) { return document.getElementById(id); }
+  // 利用者名・理由などはシート由来なので、必ず textContent で入れる（innerHTML に混ぜない）
+  function el(tag, props, kids) {
+    var e = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (k === 'text') e.textContent = props[k];
+      else if (k === 'cls') e.className = props[k];
+      else if (k === 'value') e.value = props[k];
+      else if (k === 'checked') e.checked = !!props[k];
+      else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2), props[k]);
+      else e.setAttribute(k, props[k]);
+    });
+    (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+  function show(id) { ['vLogin', 'vMain'].forEach(function (v) { $(v).classList.toggle('hidden', v !== id); }); }
+  function msg(text, kind) {
+    var m = $('msg'); clear(m);
+    if (text) m.appendChild(el('div', { cls: 'msg ' + (kind || 'err'), text: text }));
+    if (kind === 'ok') setTimeout(function () { if (m.textContent === text) clear(m); }, 2500);
+  }
+  $('msg').addEventListener('click', function () { clear(this); });
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function deviceId() {
+    var v = load(DEVICE_KEY);
+    if (!v) { v = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36); store(DEVICE_KEY, v); }
+    return v.slice(0, 64);
+  }
+  function newRequestId() {
+    try { return crypto.randomUUID(); } catch (e) { return 'r' + Math.random().toString(36).slice(2) + Date.now().toString(36); }
+  }
+  function dateJa(d) { var t = new Date(d + 'T00:00:00Z'); return (t.getUTCMonth() + 1) + '/' + t.getUTCDate() + '（' + WD[t.getUTCDay()] + '）'; }
+  function ymJa(ym) { var p = ym.split('-'); return p[0] + '年' + Number(p[1]) + '月'; }
+  function shiftYm(ym, n) {
+    var p = ym.split('-'), t = Number(p[0]) * 12 + Number(p[1]) - 1 + n;
+    return Math.floor(t / 12) + '-' + ('0' + (t % 12 + 1)).slice(-2);
+  }
+
+  // Google 側の結果配信が遅れたり「ページが見つかりません」を返す障害がある（yuryo・営業管理で確認）。
+  // 返事が HEDGE_MS 来なければ同じ依頼をもう1通重ねて送り、先に返った方を使う。書き込みは同じ requestId なので1回しか書かれない。
+  var SEND_MAX = 5, HEDGE_MS = 8000, ATTEMPT_TIMEOUT_MS = 20000;
+  function post(body) {
+    if (window.MOCK_API) return window.MOCK_API(body);
+    return new Promise(function (resolve, reject) {
+      var sent = 0, pending = 0, done = false, lastErr = null, ctls = [], hedgeTimer = null;
+      function finish(ok, val) {
+        if (done) return;
+        done = true;
+        clearTimeout(hedgeTimer);
+        ctls.forEach(function (c) { try { c.abort(); } catch (e) {} });
+        if (ok) resolve(val); else reject(val);
+      }
+      function settled() {
+        if (done || pending > 0) return;
+        if (lastErr) { finish(false, lastErr); return; }
+        if (sent < SEND_MAX) { setTimeout(fire, 500 * Math.pow(2, sent - 1)); return; }
+        finish(false, new Error('通信がうまくいきませんでした。電波の良い所でもう一度お試しください'));
+      }
+      function fire() {
+        if (done || sent >= SEND_MAX) return;
+        sent++; pending++;
+        if (sent > 1) msg('通信に時間がかかっています。もう一度送っています（' + sent + '/' + SEND_MAX + '）…', 'wait');
+        var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+        if (ctl) ctls.push(ctl);
+        var timer = ctl ? setTimeout(function () { ctl.abort(); }, ATTEMPT_TIMEOUT_MS) : null;
+        fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                         body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (!j || typeof j !== 'object') throw new Error('bad');
+            pending--;
+            if (j.ok) { finish(true, j.data); return; }
+            if (j.authError && body.action !== 'login') {
+              store(TOKEN_KEY, null); show('vLogin');
+              finish(false, new Error(j.error)); return;
+            }
+            lastErr = new Error(j.error || 'エラーが発生しました');
+            settled();
+          })
+          .catch(function () { pending--; settled(); })
+          .then(function () { if (timer) clearTimeout(timer); });
+        clearTimeout(hedgeTimer);
+        hedgeTimer = setTimeout(function () { if (!done && !lastErr) fire(); }, HEDGE_MS);
+      }
+      fire();
+    });
+  }
+  function authed(action, extra) {
+    return post(Object.assign({ action: action, token: load(TOKEN_KEY), requestId: newRequestId(), ym: S.ym }, extra || {}));
+  }
+
+  function ask(text, okLabel, noLabel) {
+    return new Promise(function (resolve) {
+      var o = $('askOvl');
+      $('askText').textContent = text;
+      $('askOk').textContent = okLabel || 'はい';
+      $('askNo').textContent = noLabel || 'やめる';
+      function done(v) { o.classList.add('hidden'); o.onclick = null; resolve(v); }
+      $('askOk').onclick = function () { done(true); };
+      $('askNo').onclick = function () { done(false); };
+      o.onclick = function (e) { if (e.target === o) done(false); };
+      o.classList.remove('hidden');
+    });
+  }
+  function openSheet(nodes) {
+    var s = $('sheet'); clear(s);
+    nodes.forEach(function (n) { if (n) s.appendChild(n); });
+    $('ovl').classList.remove('hidden');
+  }
+  function closeSheet() { $('ovl').classList.add('hidden'); clear($('sheet')); }
+  $('ovl').addEventListener('click', function (e) { if (e.target === this) closeSheet(); });
+
+  function typeCls(t) {
+    if (t === '新規' || t === 'リハ開始') return 't-start';
+    if (t === '終了' || t === 'リハ終了') return 't-end';
+    if (t === '入院') return 't-admit';
+    if (t === '退院') return 't-discharge';
+    if (t === '区変') return 't-kuhen';
+    if (t === '主治医変更' || t === 'ケアマネ変更' || t === '増回' || t === '減回') return 't-change';
+    return '';
+  }
+  function typeTag(t) { return el('span', { cls: 'tag ' + typeCls(t), text: t }); }
+
+  // ── 画面に反映 ──
+  // サーバの返事（{ now, month, readAt }）を受け取って描き直す。古い依頼の返事は捨てる。
+  function apply(d, seq) {
+    if (seq != null && seq !== S.seq) return;
+    S.now = d.now;
+    if (d.month && (!S.ym || d.month.ym === S.ym)) { S.month = d.month; S.ym = d.month.ym; }
+    S.readAt = d.readAt;
+    render();
+  }
+  function render() {
+    if (!S.now) return;
+    $('readAt').textContent = '事務管理シート：' + (S.readAt ? S.readAt.slice(5, 16).replace('-', '/') : '') + ' 時点';
+    renderNow();
+    if (S.month) renderLog();
+  }
+
+  function renderNow() {
+    var d = S.now, t = d.tiles;
+    var k = $('kpi'); clear(k);
+    [['今月の新規', t.starts, ''], ['今月の終了', t.ends, ''], ['純増', (t.net > 0 ? '+' : '') + t.net, t.net < 0 ? 'neg' : ''],
+     ['いま入院中', t.admitted + '人', t.admitted ? 'warn' : '']].forEach(function (x) {
+      k.appendChild(el('div', {}, [el('small', { text: x[0] }), el('b', { cls: x[2], text: String(x[1]) })]));
+    });
+
+    var items = d.inbox.filter(function (it) { return !S.hidden[it.key]; });
+    $('inboxCount').textContent = items.length + '件';
+    var bb = $('bulkBox'); clear(bb);
+    var bulk = items.filter(function (it) { return it.kind === '終了理由の確認' && it.suggestion && it.suggestion !== '未分類'; });
+    if (bulk.length) {
+      bb.appendChild(el('button', { cls: 'full', style: 'margin:6px 0 4px', text: '案のとおりにまとめて確定（' + bulk.length + '件）', onclick: function () { bulkConfirm(bulk); } }));
+      if (bulk.length < items.filter(function (it) { return it.kind === '終了理由の確認'; }).length) bb.appendChild(el('div', { cls: 'hint', text: '「未分類（案）」は残ります。チップを押して選んでください。' }));
+    }
+    var box = $('inbox'); clear(box);
+    if (!items.length) box.appendChild(el('div', { cls: 'empty', text: 'ありません' }));
+    items.forEach(function (it) {
+      var top = el('div', { cls: 'top' }, [el('b', { text: it.name }), el('span', { cls: 'dt', text: dateJa(it.date) })]);
+      if (it.kind === '終了理由の確認') {
+        var chips = el('div', { cls: 'chips' });
+        d.meta.endCategories.forEach(function (c) {
+          var sug = c === it.suggestion;
+          chips.appendChild(el('button', { cls: sug ? 'sug' : '', text: c + (sug ? '（案）' : ''), onclick: function () { classify(it, c); } }));
+        });
+        box.appendChild(el('div', { cls: 'item' }, [top, el('div', { cls: 'sub', text: '終了理由：' + (it.reason || '（記載なし）') }), chips]));
+      } else {
+        box.appendChild(el('div', { cls: 'item' }, [top, el('div', { cls: 'sub', text: it.kind + '（担当表の担当リハ：' + it.staff + '）' }),
+          el('div', { cls: 'acts' }, [
+            el('button', { text: '記録する', onclick: function () { addSheet({ '種類': it.kind === 'リハ開始の候補' ? 'リハ開始' : 'リハ終了', '日付': it.date, '利用者名': it.name }); } }),
+            el('button', { cls: 'sub', text: '無視する', onclick: function () { dismiss(it); } }),
+          ])]));
+      }
+    });
+
+    $('admCount').textContent = d.admissions.length + '人';
+    var adm = $('adm'); clear(adm);
+    if (!d.admissions.length) adm.appendChild(el('div', { cls: 'empty', text: 'いません' }));
+    d.admissions.forEach(function (a) {
+      var sub = dateJa(a.date) + ' 入院' + ([a.hospital, a.reason].filter(Boolean).length ? '・' + [a.hospital, a.reason].filter(Boolean).join('・') : '') +
+        (a.plannedDischarge ? '・退院予定 ' + dateJa(a.plannedDischarge) : '');
+      adm.appendChild(el('div', { cls: 'item tap', onclick: function () { admissionSheet(a); } }, [
+        el('div', { cls: 'top' }, [el('b', { text: a.name }), a.flagged ? el('span', { cls: 'tag warn', text: '退院日欄が読めない' }) : null,
+          el('span', { cls: 'rt' }, [el('span', { cls: 'days' + (a.long ? ' long' : ''), text: a.days + '日' }), el('div', { text: a.staff })])]),
+        el('div', { cls: 'sub', text: sub })]));
+    });
+
+    $('kuhenCount').textContent = d.kuhen.length + '人';
+    var ku = $('kuhen'); clear(ku);
+    if (!d.kuhen.length) ku.appendChild(el('div', { cls: 'empty', text: 'いません' }));
+    d.kuhen.forEach(function (x) {
+      ku.appendChild(el('div', { cls: 'item' }, [
+        el('div', { cls: 'top' }, [el('b', { text: x.name }), el('span', { cls: 'rt' }, [el('span', { cls: 'days' + (x.long ? ' long' : ''), text: x.days + '日' }), el('div', { text: x.staff })])]),
+        el('div', { cls: 'sub', text: dateJa(x.date) + (x.before ? '・今は ' + x.before : '') })]));
+    });
+
+    $('issuesCard').classList.toggle('hidden', !d.issues.length);
+    $('issuesHead').textContent = '要確認 ' + d.issues.length + '件';
+    var is = $('issues'); clear(is);
+    d.issues.forEach(function (x) {
+      is.appendChild(el('div', { cls: 'item' }, [el('div', { text: x.kind + (x.name ? '：' + x.name : '') }),
+        el('div', { cls: 'sub', text: x.tab + (x.row ? ' ' + x.row + '行目' : '') + (x.value ? '・' + x.value : '') + (x.date ? '・' + x.date : '') })]));
+    });
+    $('roster').textContent = '名簿の記録：' + (d.rosterSince ? dateJa(d.rosterSince) + 'から（毎朝6時）' : 'まだありません（毎朝6時に記録）');
+  }
+
+  function renderLog() {
+    var d = S.month, c = d.stats.counts;
+    $('mLabel').textContent = ymJa(d.ym);
+    var st = $('mStats'); clear(st);
+    [['新規', d.stats.starts], ['終了', d.stats.ends], ['純増', (d.stats.net > 0 ? '+' : '') + d.stats.net], ['入院', c['入院'] || 0], ['退院', c['退院'] || 0], ['区変', c['区変'] || 0]]
+      .forEach(function (x) { st.appendChild(el('span', {}, [x[0] + ' ', el('b', { text: String(x[1]) })])); });
+    var list = $('mList'); clear(list);
+    if (!d.events.length) list.appendChild(el('div', { cls: 'empty', text: 'この月の出来事はありません' }));
+    var last = '', day = null;
+    d.events.forEach(function (e) {
+      if (e.date !== last) { day = el('div', { cls: 'day' }, [el('h3', { text: dateJa(e.date) })]); list.appendChild(day); last = e.date; }
+      var tags = [typeTag(e.type), el('b', { text: e.name })];
+      if (e.source !== '事務管理') tags.push(el('span', { cls: 'tag', text: e.source }));
+      if (!e.counted) tags.push(el('span', { cls: 'tag', text: '数えない' }));
+      if (e.supp && e.supp['確認済み']) tags.push(el('span', { cls: 'tag', text: '確認済み' }));
+      if (e.endCategory) tags.push(el('span', { cls: 'tag' + (e.endCategory.confirmed ? '' : ' warn'), text: e.endCategory.category + (e.endCategory.confirmed ? '' : '（案）') }));
+      tags.push(el('span', { cls: 'rt', text: e.staff }));
+      var memo = (e.supp && e.supp['メモ']) || e.memo;
+      day.appendChild(el('div', { cls: 'item tap', onclick: function () { eventSheet(e); } }, [el('div', { cls: 'top' }, tags),
+        e.detail ? el('div', { cls: 'sub', text: e.detail }) : null, memo ? el('div', { cls: 'sub', text: 'メモ：' + memo }) : null]));
+    });
+  }
+
+  // ── 書き込み ──
+  // 確認待ちの操作は押した瞬間に消し、裏で保存する。失敗したら戻して知らせる。
+  function quietSave(action, extra, keys, okText) {
+    keys.forEach(function (k) { S.hidden[k] = true; });
+    S.pending++;
+    render();
+    return authed(action, extra).then(function (d) {
+      S.pending--;
+      if (S.pending === 0) apply(d);
+      if (okText) msg(okText, 'ok');
+    }, function (e) {
+      S.pending--;
+      keys.forEach(function (k) { delete S.hidden[k]; });
+      render();
+      msg(e.message);
+    });
+  }
+  function classify(it, c) { quietSave('saveSupp', { supp: { 'キー': it.key, '終了理由分類': c } }, [it.key]); }
+  function dismiss(it) { quietSave('saveSupp', { supp: { 'キー': it.key, '対象外': true } }, [it.key]); }
+  async function bulkConfirm(items) {
+    if (!(await ask(items.length + '件を、案のとおりの分類で確定します。\nあとから「記録」で開けば直せます。', '確定する'))) return;
+    quietSave('saveSuppMany', { list: items.map(function (it) { return { 'キー': it.key, '終了理由分類': it.suggestion }; }) },
+      items.map(function (it) { return it.key; }), items.length + '件を確定しました');
+  }
+
+  // 保存して返事を待つ（入力欄の操作）。成功したら入力欄を閉じて描き直す。
+  async function saveAndWait(btn, action, extra, okText) {
+    btn.disabled = true;
+    msg('保存しています…', 'wait');
+    try {
+      var d = await authed(action, extra);
+      closeSheet();
+      apply(d);
+      msg(okText || '保存しました', 'ok');
+    } catch (e) {
+      msg(e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function admissionSheet(a) {
+    var btn = el('button', { cls: 'full', text: '退院済みにする' });
+    btn.onclick = function () { saveAndWait(btn, 'saveSupp', { supp: { 'キー': a.key, '退院済み': true } }, '退院済みにしました'); };
+    openSheet([el('h2', { text: a.name }), el('div', { cls: 'muted', text: dateJa(a.date) + ' 入院・' + a.days + '日目' }),
+      el('p', { cls: 'hint', text: '退院したのに事務管理シートに退院の行が無いときは、ここで一覧から外せます。' }),
+      btn, el('button', { cls: 'full sub', text: '閉じる', onclick: closeSheet })]);
+  }
+
+  function eventSheet(e) {
+    var sp = e.supp || {};
+    var nodes = [el('h2', {}, [typeTag(e.type), el('span', { text: e.name })]),
+      el('div', { cls: 'muted', text: dateJa(e.date) + '・' + e.source + (e.staff ? '・' + e.staff : '') })];
+    if (e.detail) nodes.push(el('p', { cls: 'hint', style: 'font-size:14px;color:#555', text: e.detail }));
+    if (e.memo) nodes.push(el('p', { cls: 'hint', style: 'font-size:14px;color:#555', text: '手入力のメモ：' + e.memo }));
+    var cat = e.endCategory && e.endCategory.confirmed ? e.endCategory.category : '';
+    if (e.endCategory) {
+      var chips = el('div', { cls: 'chips' });
+      S.now.meta.endCategories.forEach(function (c) {
+        var b = el('button', { text: c + (!e.endCategory.confirmed && c === e.endCategory.category ? '（案）' : ''),
+          cls: c === cat ? 'on' : (!e.endCategory.confirmed && c === e.endCategory.category ? 'sug' : '') });
+        b.onclick = function () { cat = c; Array.prototype.forEach.call(chips.children, function (x) { x.className = x === b ? 'on' : ''; }); };
+        chips.appendChild(b);
+      });
+      nodes.push(el('label', { cls: 'lb', text: '終了理由の分類' }), chips);
+    }
+    var dis = e.type === '入院' ? el('input', { type: 'checkbox', checked: sp['退院済み'] }) : null;
+    if (dis) nodes.push(el('label', { cls: 'check' }, [dis, '退院済み（退院の行が無いとき）']));
+    var memo = el('textarea', { maxlength: '200' }); memo.value = sp['メモ'] || '';
+    var okc = el('input', { type: 'checkbox', checked: sp['確認済み'] });
+    nodes.push(el('label', { cls: 'lb', text: 'メモ' }), memo, el('label', { cls: 'check' }, [okc, '確認済み']));
+    var ex = e.source === '事務管理' ? el('input', { type: 'checkbox' }) : null;
+    if (ex) nodes.push(el('label', { cls: 'check' }, [ex, 'この行を隠す（リハと関係ないとき）']));
+    var save = el('button', { cls: 'full', text: '保存する' });
+    save.onclick = async function () {
+      var p = { 'キー': e.key, 'メモ': memo.value, '確認済み': okc.checked };
+      if (cat) p['終了理由分類'] = cat;
+      if (dis) p['退院済み'] = dis.checked;
+      if (ex && ex.checked) {
+        if (!(await ask('この行を一覧から隠します。よろしいですか？', '隠す'))) return;
+        p['対象外'] = true;
+      }
+      saveAndWait(save, 'saveSupp', { supp: p });
+    };
+    nodes.push(save);
+    if (e.id) {
+      var del = el('button', { cls: 'full del', text: 'この手入力を消す' });
+      del.onclick = async function () {
+        if (!(await ask('この手入力を消します。よろしいですか？', '消す'))) return;
+        saveAndWait(del, 'deleteManual', { id: e.id }, '消しました');
+      };
+      nodes.push(del);
+    }
+    nodes.push(el('button', { cls: 'full sub', text: '閉じる', onclick: closeSheet }));
+    openSheet(nodes);
+  }
+
+  function addSheet(pre) {
+    pre = pre || {};
+    var meta = S.now.meta;
+    var type = el('select');
+    meta.manualTypes.forEach(function (t) { var o = el('option', { text: t, value: t }); if (t === pre['種類']) o.selected = true; type.appendChild(o); });
+    var date = el('input', { type: 'date' }); date.value = pre['日付'] || S.now.asOf;
+    var name = el('input', { list: 'names', autocomplete: 'off' }); name.value = pre['利用者名'] || '';
+    var dl = el('datalist', { id: 'names' });
+    S.now.names.forEach(function (n) { dl.appendChild(el('option', { value: n.name, text: n.active ? n.staff : '担当なし' })); });
+    var l1 = el('label', { cls: 'lb' }), v1 = el('input', { maxlength: '200' });
+    var memo = el('textarea', { maxlength: '200' });
+    function sync() { var lab = (meta.manualFields[type.value] || [''])[0]; l1.textContent = lab; l1.classList.toggle('hidden', !lab); v1.classList.toggle('hidden', !lab); }
+    type.onchange = sync; sync();
+    var rid = newRequestId();   // 成功するまで同じ requestId（返事が届かず押し直しても二重に書かれない）
+    var btn = el('button', { cls: 'full', text: '記録する' });
+    btn.onclick = async function () {
+      var nm = name.value.trim();
+      if (!nm) { msg('利用者を選んでください'); return; }
+      if (!S.now.names.some(function (n) { return n.name === nm; }) &&
+          !(await ask('「' + nm + '」は担当表にいません。このまま記録しますか？', '記録する'))) return;
+      btn.disabled = true;
+      msg('記録しています…', 'wait');
+      try {
+        var d = await post({ action: 'addManual', token: load(TOKEN_KEY), requestId: rid, ym: S.ym,
+          manual: { '種類': type.value, '日付': date.value, '利用者名': nm, '項目1': v1.value, '項目2': '', 'メモ': memo.value } });
+        closeSheet(); apply(d); msg('記録しました', 'ok');
+      } catch (e) { msg(e.message); } finally { btn.disabled = false; }
+    };
+    openSheet([el('h2', { text: '出来事を記録する' }), el('label', { cls: 'lb', text: '種類' }), type, el('label', { cls: 'lb', text: '日付' }), date,
+      el('label', { cls: 'lb', text: '利用者' }), name, dl, l1, v1, el('label', { cls: 'lb', text: 'メモ' }), memo, btn,
+      el('button', { cls: 'full sub', text: 'やめる', onclick: closeSheet })]);
+  }
+
+  // ── タブ・月 ──
+  function tab(t) {
+    S.tab = t;
+    $('tabNow').classList.toggle('on', t === 'now'); $('tabLog').classList.toggle('on', t === 'log');
+    $('pNow').classList.toggle('hidden', t !== 'now'); $('pLog').classList.toggle('hidden', t !== 'log');
+  }
+  $('tabNow').addEventListener('click', function () { tab('now'); });
+  $('tabLog').addEventListener('click', function () { tab('log'); });
+  async function moveMonth(n) {
+    S.ym = shiftYm(S.ym, n);
+    $('mLabel').textContent = ymJa(S.ym);
+    clear($('mList')); $('mList').appendChild(el('div', { cls: 'empty', text: '読み込み中…' }));
+    var seq = ++S.seq;
+    try { apply(await authed('month'), seq); } catch (e) { if (seq === S.seq) msg(e.message); }
+  }
+  $('mPrev').addEventListener('click', function () { moveMonth(-1); });
+  $('mNext').addEventListener('click', function () { moveMonth(1); });
+  $('addNow').addEventListener('click', function () { addSheet(); });
+  $('addLog').addEventListener('click', function () { addSheet(); });
+
+  // ── ログイン・起動 ──
+  $('btnPin').addEventListener('click', async function () {
+    var btn = this;
+    btn.disabled = true; msg('確認中…', 'wait');
+    try {
+      var d = await post({ action: 'login', pin: $('pin').value, deviceId: deviceId(), requestId: newRequestId() });
+      $('pin').value = '';
+      store(TOKEN_KEY, d.token);
+      msg('');
+      await start(false);
+    } catch (e) { msg(e.message); } finally { btn.disabled = false; }
+  });
+  $('pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('btnPin').click(); });
+  $('logout').addEventListener('click', async function (e) {
+    e.preventDefault();
+    if (!(await ask('ログアウトしますか？\n次に開くときはPINが要ります。', 'ログアウト'))) return;
+    try { await authed('logout'); } catch (x) {}
+    store(TOKEN_KEY, null); S.now = null; S.month = null; show('vLogin');
+  });
+  $('refresh').addEventListener('click', function (e) { e.preventDefault(); start(true); });
+
+  async function start(refresh) {
+    show('vMain');
+    msg(refresh ? '事務管理シートを読み直しています…' : '読み込み中…', 'wait');
+    var seq = ++S.seq;
+    try {
+      apply(await authed('init', { refresh: !!refresh }), seq);
+      msg(refresh ? '最新にしました' : '', refresh ? 'ok' : undefined);
+    } catch (e) { if (seq === S.seq) msg(e.message); }
+  }
+
+  (window.MOCK_READY || Promise.resolve()).then(function () {
+    if (load(TOKEN_KEY)) start(false); else show('vLogin');
+  });
+})();
+</script>
+</body>
+</html>
