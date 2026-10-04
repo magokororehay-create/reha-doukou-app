@@ -144,7 +144,8 @@
   var WD = ['日', '月', '火', '水', '木', '金', '土'];
   // hidden：押した瞬間に画面から消した確認待ちのキー。保存の返事が前後して届いても出し直さない（失敗したら外して戻す）。
   // seq：月の切り替えを素早くしたとき、遅れて届いた古い返事で上書きしないため。
-  var S = { now: null, month: null, ym: '', readAt: '', tab: 'now', hidden: {}, seq: 0, pending: 0 };
+  // pick：確認待ちで選んだだけ（まだ保存していない）分類。誤タップで保存しないよう、確定ボタンを押すまで書かない。
+  var S = { now: null, month: null, ym: '', readAt: '', tab: 'now', hidden: {}, pick: {}, seq: 0, pending: 0 };
 
   function $(id) { return document.getElementById(id); }
   // 利用者名・理由などはシート由来なので、必ず textContent で入れる（innerHTML に混ぜない）
@@ -308,12 +309,7 @@
     items.forEach(function (it) {
       var top = el('div', { cls: 'top' }, [el('b', { text: it.name }), el('span', { cls: 'dt', text: dateJa(it.date) })]);
       if (it.kind === '終了理由の確認') {
-        var chips = el('div', { cls: 'chips' });
-        d.meta.endCategories.forEach(function (c) {
-          var sug = c === it.suggestion;
-          chips.appendChild(el('button', { cls: sug ? 'sug' : '', text: c + (sug ? '（案）' : ''), onclick: function () { classify(it, c); } }));
-        });
-        box.appendChild(el('div', { cls: 'item' }, [top, el('div', { cls: 'sub', text: '終了理由：' + (it.reason || '（記載なし）') }), chips]));
+        box.appendChild(reasonItem(it, top));
       } else {
         box.appendChild(el('div', { cls: 'item' }, [top, el('div', { cls: 'sub', text: it.kind + '（担当表の担当リハ：' + it.staff + '）' }),
           el('div', { cls: 'acts' }, [
@@ -394,8 +390,38 @@
       msg(e.message);
     });
   }
+  // 終了理由の確認の1件。チップを押すと選ぶだけ（もう一度押すと外す）。「○○で確定」を押したときだけ保存する。
+  function reasonItem(it, top) {
+    var node = el('div', { cls: 'item' });
+    function draw() {
+      clear(node);
+      var picked = S.pick[it.key] || '';
+      var chips = el('div', { cls: 'chips' });
+      S.now.meta.endCategories.forEach(function (c) {
+        var sug = c === it.suggestion;
+        chips.appendChild(el('button', { cls: c === picked ? 'on' : (sug ? 'sug' : ''), text: c + (sug ? '（案）' : ''),
+          onclick: function () { if (S.pick[it.key] === c) delete S.pick[it.key]; else S.pick[it.key] = c; draw(); } }));
+      });
+      node.appendChild(top);
+      node.appendChild(el('div', { cls: 'sub', text: '終了理由：' + (it.reason || '（記載なし）') }));
+      node.appendChild(chips);
+      if (picked) {
+        node.appendChild(el('div', { cls: 'acts' }, [
+          el('button', { text: '「' + picked + '」で確定', onclick: function () { delete S.pick[it.key]; classify(it, picked); } }),
+          el('button', { cls: 'sub', text: '選び直す', onclick: function () { delete S.pick[it.key]; draw(); } }),
+        ]));
+      } else {
+        node.appendChild(el('div', { cls: 'hint', text: '分類を選ぶと「確定」ボタンが出ます（選んだだけでは保存しません）' }));
+      }
+    }
+    draw();
+    return node;
+  }
   function classify(it, c) { quietSave('saveSupp', { supp: { 'キー': it.key, '終了理由分類': c } }, [it.key]); }
-  function dismiss(it) { quietSave('saveSupp', { supp: { 'キー': it.key, '対象外': true } }, [it.key]); }
+  async function dismiss(it) {
+    if (!(await ask(it.name + ' さんの「' + it.kind + '」を無視します。\n確認待ちから消えます。', '無視する'))) return;
+    quietSave('saveSupp', { supp: { 'キー': it.key, '対象外': true } }, [it.key]);
+  }
   async function bulkConfirm(items) {
     if (!(await ask(items.length + '件を、案のとおりの分類で確定します。\nあとから「記録」で開けば直せます。', '確定する'))) return;
     quietSave('saveSuppMany', { list: items.map(function (it) { return { 'キー': it.key, '終了理由分類': it.suggestion }; }) },
