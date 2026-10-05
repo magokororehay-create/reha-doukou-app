@@ -86,8 +86,23 @@
   #askText{font-size:16px;line-height:1.7;white-space:pre-line;}
   .askBtns{display:flex;gap:10px;margin-top:18px;}
   .askBtns button{flex:1;padding:14px 8px;}
+  table.tb{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;font-variant-numeric:tabular-nums;}
+  table.tb th,table.tb td{padding:6px 3px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+  table.tb th:first-child,table.tb td:first-child{text-align:left;}
+  table.tb th{color:var(--mute);font-weight:600;font-size:12px;}
+  table.tb td.na{color:var(--mute);text-align:center;}
+  table.tb tr.total td{font-weight:700;border-top:2px solid #ddd;}
+  .scroll{overflow-x:auto;}
+  .bars .br{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:14px;}
+  .bars .br .lbl{width:8em;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bars .br .trk{flex:1;height:14px;background:#f1f3f4;border-radius:4px;overflow:hidden;}
+  .bars .br .fill{height:100%;background:var(--pri);border-radius:0 4px 4px 0;}
+  .bars .br .val{width:3em;flex:none;text-align:right;font-variant-numeric:tabular-nums;color:#333;}
+  .up{color:var(--pri);} .down{color:var(--red);}
+  .chartbox{position:relative;height:260px;margin-top:8px;}
   @media (max-width:420px){.kpi{grid-template-columns:repeat(2,1fr);}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') document.write('<script src="mock.js"><\/script>');</script>
 </head>
 <body>
@@ -96,7 +111,7 @@
   <div id="msg"></div>
 
   <div id="vLogin" class="card hidden">
-    <div class="muted">PINを入れてください（この端末では30日間入れ直さなくて済みます）</div>
+    <div class="muted">PINを入れてください（この端末では、最後に使ってから30日は入れ直さなくて済みます）</div>
     <input id="pin" type="password" inputmode="numeric" autocomplete="off" style="margin-top:8px;">
     <button id="btnPin" class="full">入る</button>
   </div>
@@ -106,6 +121,7 @@
     <div class="tabs">
       <button id="tabNow" class="on">いま</button>
       <button id="tabLog">記録</button>
+      <button id="tabKi">ダッシュボード</button>
     </div>
 
     <div id="pNow">
@@ -126,6 +142,14 @@
       </div>
       <div class="card"><div id="mList"></div></div>
     </div>
+
+    <div id="pKi" class="hidden">
+      <div class="card">
+        <div class="monthbar"><button id="kPrev" class="sub">◀</button><b id="kLabel"></b><button id="kNext" class="sub">▶</button></div>
+        <div id="kRange" class="hint" style="text-align:center"></div>
+      </div>
+      <div id="kBody"></div>
+    </div>
   </div>
 </div>
 
@@ -145,7 +169,8 @@
   // hidden：押した瞬間に画面から消した確認待ちのキー。保存の返事が前後して届いても出し直さない（失敗したら外して戻す）。
   // seq：月の切り替えを素早くしたとき、遅れて届いた古い返事で上書きしないため。
   // pick：確認待ちで選んだだけ（まだ保存していない）分類。誤タップで保存しないよう、確定ボタンを押すまで書かない。
-  var S = { now: null, month: null, ym: '', readAt: '', tab: 'now', hidden: {}, pick: {}, seq: 0, pending: 0 };
+  // ki：ダッシュボードで見ている期、kiCache：期ごとの返事（書き込みや「最新にする」で捨てて取り直す）。
+  var S = { now: null, month: null, ym: '', readAt: '', tab: 'now', hidden: {}, pick: {}, seq: 0, pending: 0, ki: 0, curKi: 0, kiCache: {}, kiSeq: 0, chart: null };
 
   function $(id) { return document.getElementById(id); }
   // 利用者名・理由などはシート由来なので、必ず textContent で入れる（innerHTML に混ぜない）
@@ -279,7 +304,10 @@
     S.now = d.now;
     if (d.month && (!S.ym || d.month.ym === S.ym)) { S.month = d.month; S.ym = d.month.ym; }
     S.readAt = d.readAt;
+    if (d.ki) { S.curKi = d.ki; if (!S.ki) S.ki = d.ki; }
+    S.kiCache = {};
     render();
+    if (S.tab === 'ki') loadKi();
   }
   function render() {
     if (!S.now) return;
@@ -536,8 +564,137 @@
   // ── タブ・月 ──
   function tab(t) {
     S.tab = t;
-    $('tabNow').classList.toggle('on', t === 'now'); $('tabLog').classList.toggle('on', t === 'log');
-    $('pNow').classList.toggle('hidden', t !== 'now'); $('pLog').classList.toggle('hidden', t !== 'log');
+    $('tabNow').classList.toggle('on', t === 'now'); $('tabLog').classList.toggle('on', t === 'log'); $('tabKi').classList.toggle('on', t === 'ki');
+    $('pNow').classList.toggle('hidden', t !== 'now'); $('pLog').classList.toggle('hidden', t !== 'log'); $('pKi').classList.toggle('hidden', t !== 'ki');
+    if (t === 'ki') loadKi();
+  }
+  $('tabKi').addEventListener('click', function () { tab('ki'); });
+
+  // ── ダッシュボード（期） ──
+  var KI_START_MONTH = 11, KI_OFFSET = 2016;   // Ki.gs と同じ。第10期＝2025年11月〜2026年10月
+  function kiRange(ki) { var y = ki + KI_OFFSET - 1; return y + '年' + KI_START_MONTH + '月〜' + (y + 1) + '年' + (KI_START_MONTH - 1) + '月'; }
+  function mJa(ym) { return Number(ym.slice(5)) + '月'; }
+  function signed(n) { return (n > 0 ? '+' : '') + n; }
+  async function loadKi() {
+    if (!S.ki) return;
+    $('kLabel').textContent = '第' + S.ki + '期';
+    $('kRange').textContent = kiRange(S.ki);
+    $('kNext').disabled = !!(S.curKi && S.ki >= S.curKi);
+    if (S.kiCache[S.ki]) { renderKi(S.kiCache[S.ki]); return; }
+    var body = $('kBody'); clear(body);
+    body.appendChild(el('div', { cls: 'card empty', text: '読み込み中…' }));
+    var seq = ++S.kiSeq, ki = S.ki;
+    try {
+      var d = await authed('ki', { ki: ki });
+      S.kiCache[ki] = d;
+      if (seq === S.kiSeq && S.ki === ki) renderKi(d);
+    } catch (e) { if (seq === S.kiSeq) msg(e.message); }
+  }
+  $('kPrev').addEventListener('click', function () { if (S.ki > 1) { S.ki--; loadKi(); } });
+  $('kNext').addEventListener('click', function () { S.ki++; loadKi(); });
+
+  function card(title, kids, note) {
+    return el('div', { cls: 'card' }, [el('div', { cls: 'sec', text: title })].concat(note ? [el('div', { cls: 'hint', text: note })] : []).concat(kids));
+  }
+  function bars(pairs) {
+    var max = Math.max.apply(null, pairs.map(function (p) { return p[1]; }).concat([1]));
+    return el('div', { cls: 'bars' }, pairs.map(function (p) {
+      return el('div', { cls: 'br' }, [el('span', { cls: 'lbl', text: p[0] }),
+        el('span', { cls: 'trk' }, [el('span', { cls: 'fill', style: 'display:block;width:' + (p[1] / max * 100) + '%' })]),
+        el('span', { cls: 'val', text: String(p[1]) })]);
+    }));
+  }
+  function table(head, rows, totalRow) {
+    var t = el('table', { cls: 'tb' }, [el('tr', {}, head.map(function (h) { return el('th', { text: h }); }))]);
+    rows.concat(totalRow ? [totalRow] : []).forEach(function (r, i) {
+      var tr = el('tr', { cls: totalRow && i === rows.length ? 'total' : '' });
+      r.forEach(function (c) { tr.appendChild(c && c.nodeType ? c : el('td', { text: c == null ? '' : String(c) })); });
+      t.appendChild(tr);
+    });
+    return el('div', { cls: 'scroll' }, [t]);
+  }
+
+  function renderKi(v) {
+    var body = $('kBody'); clear(body);
+    if (S.chart) { S.chart.destroy(); S.chart = null; }
+    var before = v.months.filter(function (m) { return m.status === '記録前'; });
+    if (!v.coveredFrom) {
+      body.appendChild(el('div', { cls: 'card empty', text: before.length ? 'この期は事務管理シートの記録が始まる前です' : 'この期はまだ始まっていません' }));
+      return;
+    }
+    var t = v.totals, ea = v.endActive, sa = v.startActive;
+    var k = el('div', { cls: 'kpi', style: 'margin-bottom:12px' });
+    [['期の新規', t.starts, ''], ['期の終了', t.ends, ''], ['純増', signed(t.net), t.net < 0 ? 'neg' : ''],
+     ['利用者数（' + mJa(ea.ym) + '末）', ea.count == null ? '—' : ea.count + (ea.estimated ? '*' : ''), '']].forEach(function (x) {
+      k.appendChild(el('div', {}, [el('small', { text: x[0] }), el('b', { cls: x[2], text: String(x[1]) })]));
+    });
+    body.appendChild(k);
+    var notes = [];
+    if (before.length) notes.push(mJa(before[0].ym) + '〜' + mJa(before[before.length - 1].ym) + 'は事務管理シートの記録が始まる前なので、数字に入れていません。');
+    if (sa && sa.count != null) notes.push('期首（' + mJa(sa.ym) + '末）の利用者数は ' + sa.count + (sa.estimated ? '*' : '') + '人。');
+    notes.push('* は名簿の記録（毎朝6時）より前の、新規・終了からさかのぼった推定です。');
+    body.appendChild(el('div', { cls: 'hint', style: 'margin:-4px 2px 12px', text: notes.join('') }));
+
+    var canvas = el('canvas');
+    body.appendChild(card('月別の新規・終了・入院（線は月末の利用者数）', [el('div', { cls: 'chartbox' }, [canvas])]));
+    var col = function (f) { return v.months.map(function (m) { return m.status === 'ok' ? m[f] : null; }); };
+    if (window.Chart) {
+      S.chart = new Chart(canvas, { data: { labels: v.months.map(function (m) { return mJa(m.ym); }), datasets: [
+        { type: 'bar', label: '新規', data: col('starts'), backgroundColor: '#1D9E75', borderRadius: 3, yAxisID: 'y' },
+        { type: 'bar', label: '終了', data: col('ends'), backgroundColor: '#D85A30', borderRadius: 3, yAxisID: 'y' },
+        { type: 'bar', label: '入院', data: col('admit'), backgroundColor: '#BA7517', borderRadius: 3, yAxisID: 'y' },
+        { type: 'line', label: '利用者数', data: col('active'), borderColor: '#1d1d1f', backgroundColor: '#1d1d1f', pointRadius: 3, tension: 0.2, yAxisID: 'y2',
+          segment: { borderDash: function (c) { var m = v.months[c.p1DataIndex]; return m && m.estimated ? [4, 3] : undefined; } } }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } },
+          scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { beginAtZero: true, ticks: { precision: 0 } },
+                    y2: { position: 'right', grid: { display: false }, grace: '25%', ticks: { precision: 0 } } } } });   // 利用者数の小さな増減が山に見えないよう余白をとる
+    }
+
+    var rows = v.months.filter(function (m) { return m.status !== '未来'; }).map(function (m) {
+      if (m.status !== 'ok') return [mJa(m.ym), el('td', { cls: 'na', colspan: '7', text: '記録前' })];
+      return [mJa(m.ym), m.starts, m.ends, signed(m.net), m.admit, m.admittedAtEnd, m.kuhen, m.active == null ? '—' : m.active + (m.estimated ? '*' : '')];
+    });
+    body.appendChild(card('月別', [table(['月', '新規', '終了', '純増', '入院', '月末入院中', '区変', '利用者数'], rows,
+      ['期計', t.starts, t.ends, signed(t.net), t.admit, '', t.kuhen, ''])]));
+
+    var a = v.admission;
+    var ak = el('div', { cls: 'kpi' });
+    [['入院', a.count + '件'], ['平均入院日数', a.avgDays == null ? '—' : a.avgDays + '日'],
+     ['再開できた割合', a.resumeRate == null ? '—' : Math.round(a.resumeRate * 100) + '%'],
+     ['入院率', a.per100 == null ? '—' : a.per100 + '件']].forEach(function (x) {
+      ak.appendChild(el('div', { style: 'background:#f7f8fa;box-shadow:none' }, [el('small', { text: x[0] }), el('b', { text: x[1] })]));
+    });
+    body.appendChild(card('入院の分析', [ak, el('div', { cls: 'hint', style: 'margin-top:8px',
+      text: 'この期に始まった入院の今日までの結果：退院して再開 ' + a.outcomes['退院'] + '件・入院から終了 ' + a.outcomes['終了'] + '件・入院中 ' + a.outcomes['入院中'] + '件' +
+        (a.outcomes['不明'] ? '・不明 ' + a.outcomes['不明'] + '件' : '') + '。平均入院日数は退院か終了まで分かった入院だけ。入院率は利用者100人あたりの月の入院件数。' })]));
+
+    var c = v.compare, cu = c.cumulative, cmp = [];
+    if (cu && cu.cur) {
+      var line = function (label, f) {
+        var cur = cu.cur[f], prev = cu.prev ? cu.prev[f] : null;
+        var diff = prev == null ? null : cur - prev;
+        var good = diff == null || diff === 0 ? '' : ((f === 'ends' || f === 'admit') ? (diff > 0 ? 'down' : 'up') : (diff > 0 ? 'up' : 'down'));
+        return [label, f === 'net' ? signed(cur) : cur, prev == null ? '—' : (f === 'net' ? signed(prev) : prev), el('td', { cls: good, text: diff == null ? '—' : signed(diff) })];
+      };
+      cmp.push(table([mJa(v.coveredFrom) + '〜' + mJa(cu.through) + 'の累計', '第' + v.ki + '期', '第' + c.prevKi + '期', '差'],
+        [line('新規', 'starts'), line('終了', 'ends'), line('純増', 'net'), line('入院', 'admit')]));
+      if (!cu.prev) cmp.push(el('div', { cls: 'hint', text: '第' + c.prevKi + '期の同じ期間は記録前を含むので比べられません。' }));
+    }
+    var mrows = c.months.filter(function (m) { return m.cur; }).map(function (m) {
+      var p = m.prev;
+      return [mJa(m.ym), m.cur.starts + ' / ' + (p ? p.starts : '—'), m.cur.ends + ' / ' + (p ? p.ends : '—'),
+        signed(m.cur.net) + ' / ' + (p ? signed(p.net) : '—'), m.cur.admit + ' / ' + (p ? p.admit : '—')];
+    });
+    cmp.push(table(['月（今期 / 前期）', '新規', '終了', '純増', '入院'], mrows));
+    body.appendChild(card('前期との比較', cmp));
+
+    var reasons = Object.keys(v.endReasons).map(function (r) { return [r, v.endReasons[r]]; }).filter(function (p) { return p[1] > 0; })
+      .sort(function (x, y) { return y[1] - x[1]; });
+    body.appendChild(card('終了理由', [reasons.length ? bars(reasons) : el('div', { cls: 'empty', text: '終了はありません' })], '「（案）」のままの分も案の分類で数えています'));
+    var staff = Object.keys(v.byStaff).sort().map(function (st) { var b = v.byStaff[st]; return [st, b['新規'], b['終了'], b['入院']]; });
+    body.appendChild(card('担当者別', [staff.length ? table(['担当', '新規', '終了', '入院'], staff) : el('div', { cls: 'empty', text: 'ありません' })]));
+    body.appendChild(card('紹介元の居宅', [v.sources.length ? bars(v.sources.slice(0, 12)) : el('div', { cls: 'empty', text: '新規はありません' })],
+      '新規のケアマネ欄の最初の語。空なら「不明」'));
   }
   $('tabNow').addEventListener('click', function () { tab('now'); });
   $('tabLog').addEventListener('click', function () { tab('log'); });
